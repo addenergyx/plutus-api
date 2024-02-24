@@ -15,7 +15,7 @@ SITEKEY = os.getenv('SITEKEY')
 CLIENT_ID = os.getenv('CLIENT_ID')
 NOTIFICATION_TOKEN = os.getenv('NOTIFICATION_TOKEN')
 
-from common_shared_library import CaptchaBypass
+from common_shared_library.captcha_bypass import CaptchaBypass
 
 
 class PlutusApi(object):
