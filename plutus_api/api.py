@@ -8,6 +8,8 @@ from dotenv import load_dotenv
 
 load_dotenv(verbose=True, override=True)
 
+logger = logging.getLogger(__name__)
+
 AUTH_SECRET = os.getenv('PLUTUS_AUTH_SECRET')
 USER_ID = os.getenv('PLUTUS_USER_ID')
 PASS_ID = os.getenv('PLUTUS_PASS')
@@ -16,7 +18,6 @@ CLIENT_ID = os.getenv('CLIENT_ID')
 NOTIFICATION_TOKEN = os.getenv('NOTIFICATION_TOKEN')
 
 from common_shared_library.captcha_bypass import CaptchaBypass
-
 
 class PlutusApi(object):
     def __init__(self, user_id=None, pass_id=None, auth_id=None, client_id=None):
@@ -264,7 +265,7 @@ class PlutusApi(object):
         return [dic_['label'] for dic_ in self.perks_api()['perks']]
 
     def get_all_perks_with_img(self):
-        print(self.perks_api()['perks'])
+        logger.info(self.perks_api()['perks'])
         return {dic_['label']: dic_['image_url'] for dic_ in self.perks_api()['perks']}
 
 
@@ -276,13 +277,8 @@ class PlutusApi(object):
         valids['createdAt'] = pd.to_datetime(valids['createdAt'])
         per = valids.createdAt.dt.to_period("M")
         g = valids.groupby(per)
-        # print(g.sum()['amount']) # stopped working TypeError: datetime64 type does not support sum operations
 
-        # print(g['amount'].sum())  # new syntax
-        # print(g['plu_price'].mean())
-        # print(g['plu_price'].max())
-        # print(g['plu_price'].min())
-
+        logger.info(f"Monthly count between {valids['createdAt'].min()} and {valids['createdAt'].max()}")
         return g.agg(Sum=('amount', np.sum), plu_mean=('plu_price', np.mean), plu_max=('plu_price', np.max),
                     plu_min=('plu_price', np.min)).round(2)
 
