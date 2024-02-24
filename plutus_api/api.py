@@ -4,6 +4,7 @@ import pandas as pd
 import numpy as np
 import requests
 from pyotp import TOTP
+import logging
 from dotenv import load_dotenv
 
 load_dotenv(verbose=True, override=True)
