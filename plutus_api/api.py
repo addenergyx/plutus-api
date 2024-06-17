@@ -172,7 +172,7 @@ class PlutusApi(object):
             data = json.loads(response.text)
             return float(str(data['AvailableBalance'])[:-2] + '.' + str(data['AvailableBalance'])[-2:])
 
-    def get_transactions(self, limit=300):
+    def get_transactions(self, limit=300, from_date=None, to_date=None):
 
         if not self.session:
             self.session = self.login()
@@ -184,8 +184,8 @@ class PlutusApi(object):
             "variables": {
                 "offset": 0,
                 "limit": limit,
-                "from": None,
-                "to": None
+                "from": from_date,
+                "to": to_date
             },
             "query": "query transactions_view($offset: Int, $limit: Int, $from: timestamptz, $to: timestamptz, $type: String) {\n  transactions_view_aggregate(\n    where: {_and: [{date: {_gte: $from}}, {date: {_lte: $to}}]}\n  ) {\n    aggregate {\n      totalCount: count\n      __typename\n    }\n    __typename\n  }\n  transactions_view(\n    order_by: {date: desc}\n    limit: $limit\n    offset: $offset\n    where: {_and: [{date: {_gte: $from}}, {date: {_lte: $to}}, {type: {_eq: $type}}]}\n  ) {\n    id\n    model\n    user_id\n    currency\n    amount\n    date\n    type\n    is_debit\n    description\n    __typename\n  }\n}\n"
         })
