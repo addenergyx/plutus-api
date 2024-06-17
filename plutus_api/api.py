@@ -163,7 +163,7 @@ class PlutusApi(object):
     def get_card_balance(self):
 
         if not self.session:
-            self.session = self.login()
+            self.login()
 
         response = self.session.get(
             self.base_url+"platform/consumer/balance")  # {'errors': ['disabled: use cards v3 endpoint']}
@@ -175,7 +175,7 @@ class PlutusApi(object):
     def get_transactions(self, limit=300, from_date=None, to_date=None):
 
         if not self.session:
-            self.session = self.login()
+            self.login()
 
         url = "https://hasura.plutus.it/v1alpha1/graphql"
 
