@@ -1,5 +1,7 @@
 import json
 import os
+from datetime import datetime
+
 import pandas as pd
 import numpy as np
 import requests
@@ -83,9 +85,7 @@ class PlutusApi(object):
 
         # return session
 
-    # Rewards
-    def get_rewards(self):
-
+    def _get_raw_rewards(self):
         if not self.session:
             self.login()
 
@@ -100,7 +100,17 @@ class PlutusApi(object):
                 }
             }
 
-        data = json.loads(response.text)
+        return response.json()
+
+    def get_boosted_rewards(self):
+        data = self._get_raw_rewards()
+        data = pd.json_normalize(data)
+        return data[data["type"] == "BOOST_REWARD"]
+
+    # Rewards
+    def get_rewards(self):
+
+        data = self._get_raw_rewards()
         data = pd.json_normalize(data)
 
         float_values = ['amount', 'rebate_rate', 'base_rate', 'staking_rate', 'contis_transaction.transaction_amount',
@@ -112,8 +122,17 @@ class PlutusApi(object):
         data['updatedAt'] = pd.to_datetime(data['updatedAt'])
         data['createdAt'] = pd.to_datetime(data['createdAt'])
         data.drop('contis_transaction', axis=1, inplace=True)
-        # data.dropna(subset=['contis_transaction.description', 'fiat_transaction.card_transactions.description'], how='all',
-        #             inplace=True)
+
+        # These are transactions with double rewards voucher
+        # "type": "BOOST_REWARD", "reference_type": "pluton_transactions"
+        boost_reward_df = data[data["type"] == "BOOST_REWARD"].copy()
+
+        data = data[data["type"] != "BOOST_REWARD"]
+
+        # Drop rows with missing values in specific columns for rows to be checked
+        data.dropna(
+            subset=['contis_transaction.description', 'fiat_transaction.card_transactions.description'], how='all',
+            inplace=True)
 
         na_condition = data[
             ['contis_transaction.description', 'fiat_transaction.card_transactions.description']].isna().all(axis=1)
@@ -125,7 +144,7 @@ class PlutusApi(object):
         condition_to_drop = na_condition & not_rebate_condition
 
         # Drop rows based on the combined condition
-        data = data[~condition_to_drop]
+        data_to_check = data[~condition_to_drop]
 
         data['contis_transaction.description'].fillna(data['fiat_transaction.card_transactions.description'],
                                                       inplace=True)
@@ -156,6 +175,20 @@ class PlutusApi(object):
             else:
                 data.loc[index, 'plu_price'] = ((row['contis_transaction.transaction_amount'] / 100) * row[
                     'rebate_rate']) / row['amount']
+
+
+        def update_descriptions(row):
+            original_transaction = data[data["id"] == row["reference_id"]]
+            if not original_transaction.empty:
+                column_names = ["fiat_transaction.clean_description", "fiat_transaction.card_transactions.description", "plu_price", "fiat_amount_rewarded"]
+                for column in column_names:
+                    row[column] = original_transaction[column].values[0]
+            return row
+
+        boost_reward_df = boost_reward_df.apply(update_descriptions, axis=1)
+
+        # Concatenate the two DataFrames back together
+        data = pd.concat([data, boost_reward_df])
 
         return data
 
@@ -300,16 +333,35 @@ class PlutusApi(object):
         return response.json()['pluton']['gbp']
 
 
-# if __name__ == '__main__':
-#     AUTH_SECRET = os.getenv('AUTH_SECRET')
-#     USER_ID = os.getenv('USER_ID')
-#     PASS_ID = os.getenv('PASS_ID')
-#     SITEKEY = os.getenv('SITEKEY')
-#     CLIENT_ID = os.getenv('CLIENT_ID')
-#     NOTIFICATION_TOKEN = os.getenv('NOTIFICATION_TOKEN')
+if __name__ == '__main__':
+    AUTH_SECRET = os.getenv('PLUTUS_AUTH_SECRET')
+    USER_ID = os.getenv('PLUTUS_USER_ID')
+    PASS_ID = os.getenv('PLUTUS_PASS')
+    SITEKEY = os.getenv('SITEKEY')
+    CLIENT_ID = os.getenv('CLIENT_ID')
+    NOTIFICATION_TOKEN = os.getenv('NOTIFICATION_TOKEN')
 
-#     api = PlutusApi(USER_ID, PASS_ID, AUTH_SECRET, CLIENT_ID)
-#     # session = api.login()
+    api = PlutusApi(USER_ID, PASS_ID, AUTH_SECRET, CLIENT_ID)
+    # api.login()
+
+    data = api.get_rewards()
+
+    BOOST_REWARD_df = data[data["type"] == "BOOST_REWARD"].copy()
+
+    ace = api.get_boosted_rewards()
+    ace['createdAt'] = pd.to_datetime(ace['createdAt'])
+
+    # Get the current date and time
+    now = datetime.now()
+
+    # Check if there are any rewards in the current month using vectorized operations
+    if ((ace['createdAt'].dt.year == now.year) & (ace['createdAt'].dt.month == now.month)).any():
+        print("Yes")
+    else:
+        print("No")
+
+
+    # session = api.login()
 
 #     # url = "https://hasura.plutus.it/v1alpha1/graphql"
 
